@@ -1,8 +1,9 @@
 const ytdl = require('ytdl-core');
 const ytSearch = require('yt-search');
+const { measureMemory } = require('vm');
 
 const queue = new Map();
-
+//queue (message.guild.id, queue_constructor object { voice channel, text channel, connection, song})
 module.exports = 
 {
     name: 'play',
@@ -18,5 +19,47 @@ module.exports =
         if (!permissions.has('Connect')) return message.channel.send('You dont have permission to do this.');
         if (!permissions.has('Speak')) return message.channel.send('You dont have permission to do this.');
         
+        const server_queue = queue.get(message.guild.id)
+
+        if (cmd === 'play')
+        {
+            if (!args.length) return message.channel.send('please enter a valid link');
+            let song = {};
+
+            if(ytdl.validateURL(args[0]))
+            {
+                const song_info = await ytdl.getInfo(args[0]);
+                song = {title: song_info.videoDetails.title, url: song_info.videoDetails.video_url}
+            }
+            else
+            {
+                const video_finder = async (query) =>
+                {
+                    const videoResult = await ytSearch(query);
+                    return (videoResult.videos.length > 1) ? videoResult.videos[0] : null;
+                }
+                const video = await video_finder(args.join(' '));
+                if(video)
+                {
+                    song = { title: video.title, url: video.url}
+                }
+                else
+                {
+                    message.channel.send('Cant find video')
+                }
+            }
+        }
+        if (!server_queue)
+        {
+            const queue_constructor = {
+                voice_channel: voice_channel,
+                text_channel: message.channel,
+                connection: null,
+                song: []
+            }
+
+            queue.set(message.guild.id, queue_constructor);
+            queue_constructor.songs.push(song);
+        }
     }
 }
